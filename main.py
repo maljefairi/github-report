@@ -1,13 +1,11 @@
 from utils import *
 import openai
 from dotenv import load_dotenv
+import os
+import json
 
 load_dotenv()
-
-# Get the OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Call the function to remove previous output files
 remove_previous_output('.')
 
 SETTINGS_FILE = "settings.txt"
@@ -15,8 +13,7 @@ repository_path = '.'
 
 try:
     all_file_types = get_file_types(repository_path)
-except Exception as e:
-    print(f"An error occurred while getting file types: {str(e)}")
+except Exception:
     exit(1)
 
 if os.path.isfile(SETTINGS_FILE):
@@ -37,7 +34,6 @@ ignore_patterns = parse_gitignore(repository_path)
 all_files = get_all_files(repository_path, included_file_types, ignore_patterns)
 
 for file_path, file_content in all_files:
-    print(f"Processing file: {file_path}")
     if 'GPT' not in file_path:
         response = openai.ChatCompletion.create(
             model="gpt-4",

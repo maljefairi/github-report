@@ -2,22 +2,19 @@ import os
 import fnmatch
 import json
 
-# List of directories to ignore
 IGNORED_DIRS = ['__pycache__', '.git', '.venv', '.docker', '.pipenv']
-
-# List of file types/extensions to ignore
 IGNORED_FILE_TYPES = ['.pyc', '.pyo', '.pyd', '.whl', '.zip', '.tar', '.gz', '.rar', '.7z', '.dll', '.so', '.dylib']
 
 def get_all_files(directory, file_types, ignore_patterns):
     code_data = []
     for root, dirs, files in os.walk(directory):
-        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]  # Filter out unwanted directories
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]  
         for file in files:
             file_ext = os.path.splitext(file)[-1].lower()
-            if file_ext in IGNORED_FILE_TYPES:  # Skip files with unwanted file types
+            if file_ext in IGNORED_FILE_TYPES:  
                 continue
             file_path = os.path.join(root, file)
-            file_path = os.path.abspath(file_path)  # Ensure path is absolute
+            file_path = os.path.abspath(file_path)
             relative_path = os.path.relpath(file_path, directory)
             if is_ignored(relative_path, ignore_patterns):
                 continue
@@ -27,17 +24,13 @@ def get_all_files(directory, file_types, ignore_patterns):
                     code_data.append((relative_path, file_content))
     return code_data
 
-
-# Function to remove previous output files
 def remove_previous_output(directory, pattern='scanned*.txt'):
     for root, dirs, files in os.walk(directory):
         for file in files:
             if fnmatch.fnmatch(file, pattern):
                 os.remove(os.path.join(root, file))
 
-# Function to ask user for inputs
 def ask_user_inputs(all_file_types, repository_path):
-    print('The file types found in the directory are:')
     included_file_types = []
     for file_type in all_file_types:
         file_count, word_count = count_files_and_words(repository_path, file_type)
@@ -50,7 +43,6 @@ def ask_user_inputs(all_file_types, repository_path):
     additional_text = input("Do you want to add any text after 'This is the prompt number {}'? Enter the text or leave it blank: ")
     return included_file_types, max_words, include_tree, additional_text
 
-# Function to parse .gitignore file for ignore patterns
 def parse_gitignore(directory):
     gitignore_path = os.path.join(directory, ".gitignore")
     if not os.path.exists(gitignore_path):
@@ -59,30 +51,12 @@ def parse_gitignore(directory):
         lines = file.read().split("\n")
     return lines
 
-# Function to check if the given path is ignored
 def is_ignored(path, ignore_patterns):
     for pattern in ignore_patterns:
         if fnmatch.fnmatch(path, pattern):
             return True
     return False
 
-# Function to get all files in the directory matching the file types and not matching the ignore patterns
-def get_all_files(directory, file_types, ignore_patterns):
-    code_data = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            file_path = os.path.join(root, file)
-            relative_path = os.path.relpath(file_path, directory)
-            if is_ignored(relative_path, ignore_patterns):
-                continue
-            file_ext = os.path.splitext(file)[-1].lower()
-            if file_ext in file_types and file != 'scannerPro2.py':
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
-                    code_data.append((relative_path, file_content))
-    return code_data
-
-# Function to get all unique file types in the directory
 def get_file_types(directory):
     file_types = set()
     for root, dirs, files in os.walk(directory):
@@ -91,7 +65,6 @@ def get_file_types(directory):
             file_types.add(file_ext)
     return file_types
 
-# Function to count the number of files and words of the given file type in the directory
 def count_files_and_words(directory, file_type):
     file_count = 0
     word_count = 0
@@ -107,7 +80,6 @@ def count_files_and_words(directory, file_type):
                     print(f"Skipped file due to UnicodeDecodeError: {os.path.join(root, file)}")
     return file_count, word_count
 
-# Function to split text into chunks of max_words
 def split_text(text, max_words):
     words = text.split()
     chunks = []
@@ -124,7 +96,6 @@ def split_text(text, max_words):
     chunks.append(' '.join(chunk))
     return chunks
 
-# Function to generate the directory tree
 def generate_directory_tree(directory):
     tree = ''
     for root, dirs, files in os.walk(directory):
