@@ -1,108 +1,61 @@
 import os
 import fnmatch
-import json
+import codecs
+from typing import List, Tuple
 
-IGNORED_DIRS = ['__pycache__', '.git', '.venv', '.docker', '.pipenv']
-IGNORED_FILE_TYPES = ['.pyc', '.pyo', '.pyd', '.whl', '.zip', '.tar', '.gz', '.rar', '.7z', '.dll', '.so', '.dylib']
-
-def get_all_files(directory, file_types, ignore_patterns):
-    code_data = []
-    for root, dirs, files in os.walk(directory):
-        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]  
-        for file in files:
-            file_ext = os.path.splitext(file)[-1].lower()
-            if file_ext in IGNORED_FILE_TYPES:  
-                continue
-            file_path = os.path.join(root, file)
-            file_path = os.path.abspath(file_path)
-            relative_path = os.path.relpath(file_path, directory)
-            if is_ignored(relative_path, ignore_patterns):
-                continue
-            if file_ext in file_types and file != 'scannerPro2.py':
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
-                    code_data.append((relative_path, file_content))
-    return code_data
-
-def remove_previous_output(directory, pattern='scanned*.txt'):
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if fnmatch.fnmatch(file, pattern):
-                os.remove(os.path.join(root, file))
-
-def ask_user_inputs(all_file_types, repository_path):
-    included_file_types = []
-    for file_type in all_file_types:
-        file_count, word_count = count_files_and_words(repository_path, file_type)
-        include = input(f'Do you want to include files of type {file_type} ({file_count} files, {word_count} words)? (y/n) ')
-        if include.lower() == 'y':
-            included_file_types.append(file_type)
-    max_words_input = input('How many words do you want to include in each file? Leave blank for no splitting: ')
-    max_words = int(max_words_input) if max_words_input.isdigit() else 1500
-    include_tree = input('Do you want to include the directory tree? (y/n): ')
-    additional_text = input("Do you want to add any text after 'This is the prompt number {}'? Enter the text or leave it blank: ")
-    return included_file_types, max_words, include_tree, additional_text
-
-def parse_gitignore(directory):
-    gitignore_path = os.path.join(directory, ".gitignore")
-    if not os.path.exists(gitignore_path):
-        return []
-    with open(gitignore_path, "r") as file:
-        lines = file.read().split("\n")
-    return lines
-
-def is_ignored(path, ignore_patterns):
-    for pattern in ignore_patterns:
-        if fnmatch.fnmatch(path, pattern):
-            return True
-    return False
-
-def get_file_types(directory):
+def get_file_types(path: str) -> List[str]:
+    """Get a list of all unique file types in a directory."""
     file_types = set()
-    for root, dirs, files in os.walk(directory):
+    for root, _, files in os.walk(path):
         for file in files:
-            file_ext = os.path.splitext(file)[-1].lower()
-            file_types.add(file_ext)
-    return file_types
+            ext = os.path.splitext(file)[-1]
+            file_types.add(ext)
+    return list(file_types)
 
-def count_files_and_words(directory, file_type):
-    file_count = 0
-    word_count = 0
-    for root, dirs, files in os.walk(directory):
+def count_files_and_words(path: str, file_type: str) -> Tuple[int, int]:
+    """Count the number of files and words for a given file type in a directory."""
+    file_count, word_count = 0, 0
+    for root, _, files in os.walk(path):
         for file in files:
-            file_ext = os.path.splitext(file)[-1].lower()
-            if file_ext == file_type:
+            if file.endswith(file_type):
                 file_count += 1
-                try:
-                    with open(os.path.join(root, file), 'r', encoding='utf-8') as f:
-                        word_count += len(f.read().split())
-                except UnicodeDecodeError:
-                    print(f"Skipped file due to UnicodeDecodeError: {os.path.join(root, file)}")
-    return file_count, word_count
+                with codecs.open(os.path.join(root, file), 'r', 'utf-8', errors='ignore') as f:
+                    word_count += len(f.read().split())
+    return (file_count, word_count)
 
-def split_text(text, max_words):
-    words = text.split()
-    chunks = []
-    chunk = []
-    count = 0
-    for word in words:
-        if count + len(word.split()) <= max_words:
-            chunk.append(word)
-            count += len(word.split())
-        else:
-            chunks.append(' '.join(chunk))
-            chunk = [word]
-            count = len(word.split())
-    chunks.append(' '.join(chunk))
-    return chunks
+def ask_user_inputs(file_types: List[str], path: str) -> List[str]:
+    """Ask user for the file types to include."""
+    while True:
+        included_file_types = input("Please provide the file types to include (comma separated, with no spaces, e.g., .py,.js): ").split(',')
+        if all(file_type in file_types for file_type in included_file_types):
+            return included_file_types
+        print("Please provide valid file types.")
 
-def generate_directory_tree(directory):
-    tree = ''
-    for root, dirs, files in os.walk(directory):
-        level = root.replace(directory, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        tree += '{}{}/\n'.format(indent, os.path.basename(root))
-        sub_indent = ' ' * 4 * (level + 1)
+def ask_user_for_previous_settings() -> str:
+    """Ask user if they want to use previous settings."""
+    while True:
+        use_prev_settings = input("Do you want to use the previous settings? (yes/no): ").lower()
+        if use_prev_settings in ['yes', 'no']:
+            return use_prev_settings
+        print("Please provide a valid response (yes/no).")
+
+def parse_gitignore(path: str) -> List[str]:
+    """Parse the .gitignore file and get a list of ignore patterns."""
+    ignore_patterns = []
+    gitignore = os.path.join(path, '.gitignore')
+    if os.path.isfile(gitignore):
+        with open(gitignore, 'r') as file:
+            ignore_patterns = [line.strip() for line in file]
+    return ignore_patterns
+
+def get_all_files(path: str, included_file_types: List[str], ignore_patterns: List[str]) -> List[Tuple[str, str]]:
+    """Get all files with specified file types in a directory, excluding those matching the ignore patterns."""
+    all_files = []
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, pattern) for pattern in ignore_patterns)]
+        files = [f for f in files if not any(fnmatch.fnmatch(f, pattern) for pattern in ignore_patterns) and os.path.splitext(f)[-1] in included_file_types]
         for file in files:
-            tree += '{}{}\n'.format(sub_indent, file)
-    return tree
+            with codecs.open(os.path.join(root, file), 'r', 'utf-8', errors='ignore') as f:
+                file_content = f.read()
+            all_files.append((os.path.join(root, file), file_content))
+    return all_files
