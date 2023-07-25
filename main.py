@@ -32,28 +32,39 @@ def load_or_request_settings(all_file_types):
 def process_files(all_files, output_dir):
     total_files = len(all_files)
     progress = {}
-    for i, (file_path, file_content) in enumerate(all_files):
+    i = 0
+    while i < total_files:
+        file_path, file_content = all_files[i]
         if 'GPT' not in file_path:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are an expert coder. fix the logic, errors, threats, concerns, and rewrite the code based on best practices. you will reply with nothing but the new code"},
-                    {"role": "user", "content": file_content}
-                ],
-                temperature=0.5,
-                max_tokens=4000,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0
-            )
-            improved_code = response['choices'][0]['message']['content']
-            new_file = os.path.join(output_dir, os.path.splitext(os.path.basename(file_path))[0] + 'GPT' + os.path.splitext(os.path.basename(file_path))[1])
-            with open(new_file, 'w') as f:
-                f.write(improved_code)
-            progress[file_path] = True
-            with open(os.path.join(output_dir, PROGRESS_FILE), 'w') as file:
-                json.dump(progress, file)
-            print(f'Processed file {i+1}/{total_files} ({(i+1)/total_files*100:.2f}%)')
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "You are an expert coder. fix the logic, errors, threats, concerns, and rewrite the code based on best practices. you will reply with nothing but the new code"},
+                        {"role": "user", "content": file_content}
+                    ],
+                    temperature=0.5,
+                    max_tokens=4000,
+                    top_p=1,
+                    frequency_penalty=0,
+                    presence_penalty=0
+                )
+                improved_code = response['choices'][0]['message']['content']
+                new_file = os.path.join(output_dir, os.path.splitext(os.path.basename(file_path))[0] + 'GPT' + os.path.splitext(os.path.basename(file_path))[1])
+                with open(new_file, 'w') as f:
+                    f.write(improved_code)
+                progress[file_path] = True
+                with open(os.path.join(output_dir, PROGRESS_FILE), 'w') as file:
+                    json.dump(progress, file)
+                print(f'Processed file {i+1}/{total_files} ({(i+1)/total_files*100:.2f}%)')
+                i += 1  # increment counter only if file processing is successful
+            except openai.error.RateLimitError as e:
+                print("Rate limit exceeded. Pausing for a bit...")
+                time.sleep(e.time_until_rate_limit_resets_in_seconds)  # pause for required time
+            except Exception as e:
+                print(f"An error occurred while processing the file {file_path}. Error: {e}")
+                i += 1  # increment counter if an unexpected error occurs
+
 
 def save_settings(included_file_types, output_dir):
     settings = {
